@@ -1,6 +1,8 @@
 const latLngSeparator = '_'
 const markerSeparator = '~'
 
+let foundLocation = false
+
 const map = new L.Map('map', { zoom: 12 })
 
 const layer = new L.TileLayer('https://tile.thunderforest.com/cycle/{z}/{x}/{y}{r}.png?apikey=4f3a2d6bb33747d89ca9a12fc87fd088', {
@@ -16,33 +18,7 @@ map.addLayer(layer)
 
 const locationControl = L.control.locate({ setView: 'untilPan' }).addTo(map)
 
-let foundLocation = false
 
-const initialParams = new URLSearchParams(location.hash.replace('#', ''))
-
-if (initialParams.has('c')) {
-  map.setView(parseLatLng(initialParams.get('c')), parseInt(initialParams.get('z') || 12))
-  foundLocation = true
-}
-
-if ("geolocation" in navigator && "permissions" in navigator) {
-  navigator.permissions.query({ name: "geolocation" }).then((result) => {
-    if (result.state === "granted") {
-      locationControl.start()
-      if (foundLocation) {
-        locationControl._userPanned = true
-      } else {
-        setTimeout(() => {
-          map.setView(new L.LatLng(52.52, 13.405), 12)
-          foundLocation = true
-        }, 1000)
-      }
-    } else if (!foundLocation) {
-      map.setView(new L.LatLng(52.52, 13.405), 12)
-      foundLocation = true
-    }
-  })
-}
 
 /** @param {string} latLng */
 function parseLatLng(latLng) {
@@ -91,7 +67,7 @@ function addMarker(latlng, index) {
       marker.removeTime = Date.now()
       fadeOut()
     }
-    updateLines()
+    updateMap()
     updateUrl()
   })
   marker.on('dragstart', () => {
@@ -102,7 +78,7 @@ function addMarker(latlng, index) {
     }
   })
   marker.on('dragend', updateUrl)
-  marker.on('dragend', updateLines)
+  marker.on('dragend', updateMap)
   marker.addTo(map)
   if (index) {
     markers.splice(index, 0, marker)
@@ -111,28 +87,27 @@ function addMarker(latlng, index) {
   }
 }
 
-if (initialParams.has('m')) {
-  initialParams.get('m').split(markerSeparator).map(parseLatLng).map(addMarker)
-}
-
 map.on('click', (event) => {
   addMarker(event.latlng)
-  updateLines()
+  updateMap()
   updateUrl()
 })
 
-
-function actuallyUpdateUrl() {
+/** @param {L.Marker[]} markers */
+function createUrl(markers) {
   const url = new URL(location.href)
   const hashParams = new URLSearchParams()
   hashParams.set('c', serializeLatLng(map.getCenter()))
   hashParams.set('z', map.getZoom())
-  const activeMarkers = markers.filter((marker) => !marker.removeTime)
-  if (activeMarkers.length) {
-    hashParams.set('m', activeMarkers.map(marker => serializeLatLng(marker.getLatLng())).join(markerSeparator))
+  if (markers?.length) {
+    hashParams.set('m', markers.map(marker => serializeLatLng(marker.getLatLng())).join(markerSeparator))
   }
   url.hash = hashParams
-  history.replaceState(null, '', url)
+  return url
+}
+
+function actuallyUpdateUrl() {
+  history.replaceState(null, '', createUrl(markers.filter((marker) => !marker.removeTime)))
 }
 
 let updateUrlTimeout
@@ -144,16 +119,21 @@ function updateUrl() {
 /** @type {Set<L.Polyline>} */
 const lines = new Set()
 
-function updateLines() {
+function updateMap() {
   lines.forEach((line) => {
     line.removeFrom(map)
     lines.delete(line)
   })
 
-
   const points = markers
     .filter((marker) => marker && !marker.removeTime)
     .map(marker => marker.getLatLng())
+
+  if (points.length === 0) {
+    resetControl.disable()
+  } else {
+    resetControl.enable()
+  }
 
   points.forEach((from, index) => {
     const to = points[index + 1]
@@ -168,7 +148,7 @@ function updateLines() {
 
     line.on('click', (event) => {
       addMarker(event.latlng, index + 1)
-      updateLines()
+      updateMap()
       updateUrl()
     })
 
@@ -176,6 +156,85 @@ function updateLines() {
   })
 }
 
-map.on('locationfound', updateLines)
+map.on('locationfound', updateMap)
 
-updateLines()
+const ResetControl = L.Control.extend({
+  /** @type {HTMLAnchorElement} */
+  _link: undefined,
+  onAdd() {
+    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control")
+    const link = this._link = L.DomUtil.create("a", "leaflet-bar-part leaflet-bar-part-single leaflet-control-zoom-in", container)
+    link.title = 'New map (use browser back to undo)'
+    link.href = "#"
+    link.setAttribute("role", "button")
+    const icon = L.DomUtil.create('span', 'reset-icon', link)
+    icon.textContent = '🗋' // '×' // '⟳'
+
+    L.DomEvent.on(
+      link,
+      "click",
+      (event) => {
+        L.DomEvent.stopPropagation(event)
+        L.DomEvent.preventDefault(event)
+        location.assign(createUrl())
+      }
+    )
+    L.DomEvent.on(link, "dblclick", L.DomEvent.stopPropagation)
+
+    return container
+  },
+  disable() {
+    this._link.classList.add('leaflet-disabled')
+  },
+  enable() {
+    this._link.classList.remove('leaflet-disabled')
+  }
+})
+
+const resetControl = new ResetControl({ position: 'topleft' }).addTo(map)
+
+
+function updateState() {
+  const params = new URLSearchParams(location.hash.replace('#', ''))
+
+  if (params.has('c')) {
+    map.setView(parseLatLng(params.get('c')), parseInt(params.get('z') || 12))
+    foundLocation = true
+  }
+
+  while (markers.length) {
+    markers.pop().removeFrom(map)
+  }
+
+  if (params.has('m')) {
+    params.get('m').split(markerSeparator).map(parseLatLng).map(addMarker)
+  }
+}
+
+window.addEventListener('hashchange', () => {
+  updateState()
+  updateMap()
+})
+
+updateState()
+
+if ("geolocation" in navigator && "permissions" in navigator) {
+  navigator.permissions.query({ name: "geolocation" }).then((result) => {
+    if (result.state === "granted") {
+      locationControl.start()
+      if (foundLocation) {
+        locationControl._userPanned = true
+      } else {
+        setTimeout(() => {
+          map.setView(new L.LatLng(52.52, 13.405), 12)
+          foundLocation = true
+        }, 1000)
+      }
+    } else if (!foundLocation) {
+      map.setView(new L.LatLng(52.52, 13.405), 12)
+      foundLocation = true
+    }
+  })
+}
+
+updateMap()
