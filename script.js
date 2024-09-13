@@ -31,6 +31,11 @@ if ("geolocation" in navigator && "permissions" in navigator) {
       locationControl.start()
       if (foundLocation) {
         locationControl._userPanned = true
+      } else {
+        setTimeout(() => {
+          map.setView(new L.LatLng(52.52, 13.405), 12)
+          foundLocation = true
+        }, 1000)
       }
     } else if (!foundLocation) {
       map.setView(new L.LatLng(52.52, 13.405), 12)
@@ -55,11 +60,14 @@ map.on('move', () => {
 })
 
 
-/** @type {Set<L.Marker>} */
-const markers = new Set()
+/** @type {L.Marker[]} */
+const markers = []
 
-/** @param {L.LatLng} latlng */
-function addMarker(latlng) {
+/**
+ * @param {L.LatLng} latlng
+ * @param {number} [index]
+ */
+function addMarker(latlng, index) {
   const marker = L.marker(latlng, { draggable: true })
   const fadeTime = 2000
   const fadeOut = () => {
@@ -71,7 +79,7 @@ function addMarker(latlng) {
         requestAnimationFrame(fadeOut)
       } else {
         marker.removeFrom(map)
-        markers.delete(marker)
+        markers.splice(markers.indexOf(marker), 1)
       }
     }
   }
@@ -96,7 +104,11 @@ function addMarker(latlng) {
   marker.on('dragend', updateUrl)
   marker.on('dragend', updateLines)
   marker.addTo(map)
-  markers.add(marker)
+  if (index) {
+    markers.splice(index, 0, marker)
+  } else {
+    markers.push(marker)
+  }
 }
 
 if (initialParams.has('m')) {
@@ -109,17 +121,24 @@ map.on('click', (event) => {
   updateUrl()
 })
 
-function updateUrl() {
+
+function actuallyUpdateUrl() {
   const url = new URL(location.href)
   const hashParams = new URLSearchParams()
   hashParams.set('c', serializeLatLng(map.getCenter()))
   hashParams.set('z', map.getZoom())
-  const activeMarkers = Array.from(markers).filter((marker) => !marker.removeTime)
+  const activeMarkers = markers.filter((marker) => !marker.removeTime)
   if (activeMarkers.length) {
     hashParams.set('m', activeMarkers.map(marker => serializeLatLng(marker.getLatLng())).join(markerSeparator))
   }
   url.hash = hashParams
   history.replaceState(null, '', url)
+}
+
+let updateUrlTimeout
+function updateUrl() {
+  clearTimeout(updateUrlTimeout)
+  updateUrlTimeout = setTimeout(actuallyUpdateUrl, 100)
 }
 
 /** @type {Set<L.Polyline>} */
@@ -131,20 +150,29 @@ function updateLines() {
     lines.delete(line)
   })
 
-  const points = [locationControl._marker, ...markers]
+
+  const points = markers
     .filter((marker) => marker && !marker.removeTime)
     .map(marker => marker.getLatLng())
 
-  points.forEach((latlng) => {
-    const distances = points
-      .map(ll => [ll, latlng.distanceTo(ll)])
-      .sort((a, b) => a[1] - b[1])
-    distances.slice(1, 3).forEach(([ll, distance]) => {
-      const line = L.polyline([latlng, ll])
-        .bindTooltip((distance / 1000).toFixed(1) + 'km', { permanent: true })
-        .addTo(map)
-      lines.add(line)
+  points.forEach((from, index) => {
+    const to = points[index + 1]
+
+    if (!to) return
+
+    const distance = from.distanceTo(to)
+
+    const line = L.polyline([from, to], { bubblingMouseEvents: false })
+      .bindTooltip((distance / 1000).toFixed(1) + 'km', { permanent: true })
+      .addTo(map)
+
+    line.on('click', (event) => {
+      addMarker(event.latlng, index + 1)
+      updateLines()
+      updateUrl()
     })
+
+    lines.add(line)
   })
 }
 
