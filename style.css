@@ -9,3 +9,26 @@ body {
     height: 100%;
     width: 100%;
 }
+
+.total-distance {
+    background-color: #fff;
+    padding: 6px;
+    font-size: 16px;
+}
+
+.point-icon {
+    box-sizing: border-box;
+    background-color: #fff;
+    border-radius: 100%;
+    border: 6px solid #3388ff;
+}
+
+.cycle-control a {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.cycle-control svg {
+    fill: currentColor;
+}

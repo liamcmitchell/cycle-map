@@ -1,5 +1,8 @@
 const latLngSeparator = '_'
 const markerSeparator = '~'
+const linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>'
+const clearSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
+const tickSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'
 
 let foundLocation = false
 
@@ -30,10 +33,19 @@ function serializeLatLng(latLng) {
   return [latLng.lat.toFixed(4), latLng.lng.toFixed(4)].join(latLngSeparator)
 }
 
+function formatDistance(distance = 0) {
+  return `${(distance / 1000).toFixed(1)} km`
+}
+
 map.on('move', () => {
   foundLocation = true
   updateUrl()
 })
+
+const pointIcon = L.divIcon({
+  className: 'point-icon',
+  iconSize: [16, 16],
+});
 
 
 /** @type {L.Marker[]} */
@@ -44,7 +56,10 @@ const markers = []
  * @param {number} [index]
  */
 function addMarker(latlng, index) {
-  const marker = L.marker(latlng, { draggable: true })
+  const marker = L.marker(latlng, {
+    draggable: true,
+    icon: pointIcon
+  })
   const fadeTime = 2000
   const fadeOut = () => {
     if (marker.removeTime) {
@@ -129,11 +144,9 @@ function updateMap() {
     .filter((marker) => marker && !marker.removeTime)
     .map(marker => marker.getLatLng())
 
-  if (points.length === 0) {
-    resetControl.disable()
-  } else {
-    resetControl.enable()
-  }
+  cycleControl.update(points.length > 0)
+
+  let totalDistance = 0
 
   points.forEach((from, index) => {
     const to = points[index + 1]
@@ -141,10 +154,12 @@ function updateMap() {
     if (!to) return
 
     const distance = from.distanceTo(to)
+    totalDistance += distance
 
-    const line = L.polyline([from, to], { bubblingMouseEvents: false })
-      .bindTooltip((distance / 1000).toFixed(1) + 'km', { permanent: true })
-      .addTo(map)
+    const line = L.polyline([from, to], {
+      weight: 6,
+      bubblingMouseEvents: false
+    })
 
     line.on('click', (event) => {
       addMarker(event.latlng, index + 1)
@@ -152,47 +167,93 @@ function updateMap() {
       updateUrl()
     })
 
+    line.addTo(map)
     lines.add(line)
+
+    const pixels = map.project(from).distanceTo(map.project(to))
+
+    if (pixels > 60) {
+      const tooltip = L.tooltip({
+        content: (distance / 1000).toFixed(1) + ' km',
+        direction: 'center',
+        permanent: true,
+        interactive: true,
+        bubblingMouseEvents: false
+      })
+      line.bindTooltip(tooltip)
+    }
   })
+
+  totalDistanceControl.update(totalDistance)
 }
 
 map.on('locationfound', updateMap)
+map.on('zoomend', updateMap)
 
-const ResetControl = L.Control.extend({
+const CycleControl = L.Control.extend({
   /** @type {HTMLAnchorElement} */
-  _link: undefined,
+  _clearLink: undefined,
   onAdd() {
-    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control")
-    const link = this._link = L.DomUtil.create("a", "leaflet-bar-part leaflet-bar-part-single leaflet-control-zoom-in", container)
-    link.title = 'New map (use browser back to undo)'
-    link.href = "#"
-    link.setAttribute("role", "button")
-    const icon = L.DomUtil.create('span', 'reset-icon', link)
-    icon.textContent = '🗋' // '×' // '⟳'
+    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control cycle-control")
 
-    L.DomEvent.on(
-      link,
-      "click",
-      (event) => {
-        L.DomEvent.stopPropagation(event)
-        L.DomEvent.preventDefault(event)
-        location.assign(createUrl())
-      }
-    )
-    L.DomEvent.on(link, "dblclick", L.DomEvent.stopPropagation)
+    const clearLink = this._clearLink = L.DomUtil.create("a", "leaflet-bar-part leaflet-bar-part-single clear-control", container)
+    clearLink.title = 'Clear map (use browser back to undo)'
+    clearLink.href = "#"
+    clearLink.setAttribute("role", "button")
+    clearLink.innerHTML = clearSvg
+    L.DomEvent.on(clearLink, "click", L.DomEvent.stopPropagation)
+    L.DomEvent.on(clearLink, "click", L.DomEvent.preventDefault)
+    L.DomEvent.on(clearLink, "dblclick", L.DomEvent.stopPropagation)
+    L.DomEvent.on(clearLink, "click", () => {
+      location.assign(createUrl())
+    })
+
+    const shareLink = this._shareLink = L.DomUtil.create("a", "leaflet-bar-part leaflet-bar-part-single share-control", container)
+    shareLink.title = 'Copy link'
+    shareLink.href = "#"
+    shareLink.setAttribute("role", "button")
+    shareLink.innerHTML = linkSvg
+    L.DomEvent.on(shareLink, "click", L.DomEvent.stopPropagation)
+    L.DomEvent.on(shareLink, "click", L.DomEvent.preventDefault)
+    L.DomEvent.on(shareLink, "dblclick", L.DomEvent.stopPropagation)
+    L.DomEvent.on(shareLink, "click", () => {
+      navigator.clipboard.writeText(location.href).then(() => {
+        shareLink.innerHTML = tickSvg
+        setTimeout(() => {
+          shareLink.innerHTML = linkSvg
+        }, 1000)
+      }).catch(() => {
+        alert('Failed to copy link')
+      })
+    })
 
     return container
   },
-  disable() {
-    this._link.classList.add('leaflet-disabled')
-  },
-  enable() {
-    this._link.classList.remove('leaflet-disabled')
+  update(haveMarkers) {
+    if (!haveMarkers) {
+      this._clearLink.classList.add('leaflet-disabled')
+    } else {
+      this._clearLink.classList.remove('leaflet-disabled')
+    }
+    this._shareLink.href = location.href
   }
 })
 
-const resetControl = new ResetControl({ position: 'topleft' }).addTo(map)
+const cycleControl = new CycleControl({ position: 'topleft' }).addTo(map)
 
+var totalDistanceControl = L.control()
+
+totalDistanceControl.onAdd = function () {
+  this._div = L.DomUtil.create('div', 'leaflet-control leaflet-bar total-distance')
+  this.update()
+  return this._div
+}
+
+totalDistanceControl.update = function (distance) {
+  this._div.innerHTML = formatDistance(distance)
+}
+
+totalDistanceControl.addTo(map)
 
 function updateState() {
   const params = new URLSearchParams(location.hash.replace('#', ''))
