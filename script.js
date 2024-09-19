@@ -1,27 +1,31 @@
-const latLngSeparator = '_'
-const markerSeparator = '~'
-const linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>'
-const clearSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
-const tickSvg = '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'
+const latLngSeparator = "_"
+const markerSeparator = "~"
+const linkSvg =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>'
+const clearSvg =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
+const tickSvg =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'
 
 let foundLocation = false
 
-const map = new L.Map('map', { zoom: 12 })
+const map = new L.Map("map", { zoom: 12 })
 
-const layer = new L.TileLayer('https://tile.thunderforest.com/cycle/{z}/{x}/{y}{r}.png?apikey=4f3a2d6bb33747d89ca9a12fc87fd088', {
-  maxZoom: 18,
-  attribution: [
-    '<a href="https://github.com/liamcmitchell/cycle-map">Source</a>',
-    'Maps © <a href="https://www.thunderforest.com">Thunderforest</a>',
-    'Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-  ].join(' | ')
-})
+const layer = new L.TileLayer(
+  "https://tile.thunderforest.com/cycle/{z}/{x}/{y}{r}.png?apikey=4f3a2d6bb33747d89ca9a12fc87fd088",
+  {
+    maxZoom: 18,
+    attribution: [
+      '<a href="https://github.com/liamcmitchell/cycle-map">Source</a>',
+      'Maps © <a href="https://www.thunderforest.com">Thunderforest</a>',
+      'Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+    ].join(" | "),
+  },
+)
 
 map.addLayer(layer)
 
-const locationControl = L.control.locate({ setView: 'untilPan' }).addTo(map)
-
-
+const locationControl = L.control.locate({ setView: "untilPan" }).addTo(map)
 
 /** @param {string} latLng */
 function parseLatLng(latLng) {
@@ -37,16 +41,15 @@ function formatDistance(distance = 0) {
   return `${(distance / 1000).toFixed(1)} km`
 }
 
-map.on('move', () => {
+map.on("move", () => {
   foundLocation = true
   updateUrl()
 })
 
 const pointIcon = L.divIcon({
-  className: 'point-icon',
+  className: "point-icon",
   iconSize: [16, 16],
-});
-
+})
 
 /** @type {L.Marker[]} */
 const markers = []
@@ -58,7 +61,7 @@ const markers = []
 function addMarker(latlng, index) {
   const marker = L.marker(latlng, {
     draggable: true,
-    icon: pointIcon
+    icon: pointIcon,
   })
   const fadeTime = 2000
   const fadeOut = () => {
@@ -74,7 +77,7 @@ function addMarker(latlng, index) {
       }
     }
   }
-  marker.on('click', () => {
+  marker.on("click", () => {
     if (marker.removeTime) {
       marker.removeTime = undefined
       marker.setOpacity(1)
@@ -85,15 +88,15 @@ function addMarker(latlng, index) {
     updateMap()
     updateUrl()
   })
-  marker.on('dragstart', () => {
+  marker.on("dragstart", () => {
     if (marker.removeTime) {
       marker.removeTime = undefined
       marker.setOpacity(1)
       updateUrl()
     }
   })
-  marker.on('dragend', updateUrl)
-  marker.on('dragend', updateMap)
+  marker.on("dragend", updateUrl)
+  marker.on("dragend", updateMap)
   marker.addTo(map)
   if (index) {
     markers.splice(index, 0, marker)
@@ -102,7 +105,7 @@ function addMarker(latlng, index) {
   }
 }
 
-map.on('click', (event) => {
+map.on("click", (event) => {
   addMarker(event.latlng)
   updateMap()
   updateUrl()
@@ -112,17 +115,26 @@ map.on('click', (event) => {
 function createUrl(markers) {
   const url = new URL(location.href)
   const hashParams = new URLSearchParams()
-  hashParams.set('c', serializeLatLng(map.getCenter()))
-  hashParams.set('z', map.getZoom())
+  hashParams.set("c", serializeLatLng(map.getCenter()))
+  hashParams.set("z", map.getZoom())
   if (markers?.length) {
-    hashParams.set('m', markers.map(marker => serializeLatLng(marker.getLatLng())).join(markerSeparator))
+    hashParams.set(
+      "m",
+      markers
+        .map((marker) => serializeLatLng(marker.getLatLng()))
+        .join(markerSeparator),
+    )
   }
   url.hash = hashParams
   return url
 }
 
 function actuallyUpdateUrl() {
-  history.replaceState(null, '', createUrl(markers.filter((marker) => !marker.removeTime)))
+  history.replaceState(
+    null,
+    "",
+    createUrl(markers.filter((marker) => !marker.removeTime)),
+  )
 }
 
 let updateUrlTimeout
@@ -142,7 +154,7 @@ function updateMap() {
 
   const points = markers
     .filter((marker) => marker && !marker.removeTime)
-    .map(marker => marker.getLatLng())
+    .map((marker) => marker.getLatLng())
 
   cycleControl.update(points.length > 0)
 
@@ -158,10 +170,10 @@ function updateMap() {
 
     const line = L.polyline([from, to], {
       weight: 6,
-      bubblingMouseEvents: false
+      bubblingMouseEvents: false,
     })
 
-    line.on('click', (event) => {
+    line.on("click", (event) => {
       addMarker(event.latlng, index + 1)
       updateMap()
       updateUrl()
@@ -174,11 +186,11 @@ function updateMap() {
 
     if (pixels > 60) {
       const tooltip = L.tooltip({
-        content: (distance / 1000).toFixed(1) + ' km',
-        direction: 'center',
+        content: (distance / 1000).toFixed(1) + " km",
+        direction: "center",
         permanent: true,
         interactive: true,
-        bubblingMouseEvents: false
+        bubblingMouseEvents: false,
       })
       line.bindTooltip(tooltip)
     }
@@ -187,17 +199,24 @@ function updateMap() {
   totalDistanceControl.update(totalDistance)
 }
 
-map.on('locationfound', updateMap)
-map.on('zoomend', updateMap)
+map.on("locationfound", updateMap)
+map.on("zoomend", updateMap)
 
 const CycleControl = L.Control.extend({
   /** @type {HTMLAnchorElement} */
   _clearLink: undefined,
   onAdd() {
-    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control cycle-control")
+    const container = L.DomUtil.create(
+      "div",
+      "leaflet-bar leaflet-control cycle-control",
+    )
 
-    const clearLink = this._clearLink = L.DomUtil.create("a", "leaflet-bar-part leaflet-bar-part-single clear-control", container)
-    clearLink.title = 'Clear map (use browser back to undo)'
+    const clearLink = (this._clearLink = L.DomUtil.create(
+      "a",
+      "leaflet-bar-part leaflet-bar-part-single clear-control",
+      container,
+    ))
+    clearLink.title = "Clear map (use browser back to undo)"
     clearLink.href = "#"
     clearLink.setAttribute("role", "button")
     clearLink.innerHTML = clearSvg
@@ -208,8 +227,12 @@ const CycleControl = L.Control.extend({
       location.assign(createUrl())
     })
 
-    const shareLink = this._shareLink = L.DomUtil.create("a", "leaflet-bar-part leaflet-bar-part-single share-control", container)
-    shareLink.title = 'Copy link'
+    const shareLink = (this._shareLink = L.DomUtil.create(
+      "a",
+      "leaflet-bar-part leaflet-bar-part-single share-control",
+      container,
+    ))
+    shareLink.title = "Copy link"
     shareLink.href = "#"
     shareLink.setAttribute("role", "button")
     shareLink.innerHTML = linkSvg
@@ -217,34 +240,40 @@ const CycleControl = L.Control.extend({
     L.DomEvent.on(shareLink, "click", L.DomEvent.preventDefault)
     L.DomEvent.on(shareLink, "dblclick", L.DomEvent.stopPropagation)
     L.DomEvent.on(shareLink, "click", () => {
-      navigator.clipboard.writeText(location.href).then(() => {
-        shareLink.innerHTML = tickSvg
-        setTimeout(() => {
-          shareLink.innerHTML = linkSvg
-        }, 1000)
-      }).catch(() => {
-        alert('Failed to copy link')
-      })
+      navigator.clipboard
+        .writeText(location.href)
+        .then(() => {
+          shareLink.innerHTML = tickSvg
+          setTimeout(() => {
+            shareLink.innerHTML = linkSvg
+          }, 1000)
+        })
+        .catch(() => {
+          alert("Failed to copy link")
+        })
     })
 
     return container
   },
   update(haveMarkers) {
     if (!haveMarkers) {
-      this._clearLink.classList.add('leaflet-disabled')
+      this._clearLink.classList.add("leaflet-disabled")
     } else {
-      this._clearLink.classList.remove('leaflet-disabled')
+      this._clearLink.classList.remove("leaflet-disabled")
     }
     this._shareLink.href = location.href
-  }
+  },
 })
 
-const cycleControl = new CycleControl({ position: 'topleft' }).addTo(map)
+const cycleControl = new CycleControl({ position: "topleft" }).addTo(map)
 
 var totalDistanceControl = L.control()
 
 totalDistanceControl.onAdd = function () {
-  this._div = L.DomUtil.create('div', 'leaflet-control leaflet-bar total-distance')
+  this._div = L.DomUtil.create(
+    "div",
+    "leaflet-control leaflet-bar total-distance",
+  )
   this.update()
   return this._div
 }
@@ -256,10 +285,10 @@ totalDistanceControl.update = function (distance) {
 totalDistanceControl.addTo(map)
 
 function updateState() {
-  const params = new URLSearchParams(location.hash.replace('#', ''))
+  const params = new URLSearchParams(location.hash.replace("#", ""))
 
-  if (params.has('c')) {
-    map.setView(parseLatLng(params.get('c')), parseInt(params.get('z') || 12))
+  if (params.has("c")) {
+    map.setView(parseLatLng(params.get("c")), parseInt(params.get("z") || 12))
     foundLocation = true
   }
 
@@ -267,12 +296,12 @@ function updateState() {
     markers.pop().removeFrom(map)
   }
 
-  if (params.has('m')) {
-    params.get('m').split(markerSeparator).map(parseLatLng).map(addMarker)
+  if (params.has("m")) {
+    params.get("m").split(markerSeparator).map(parseLatLng).map(addMarker)
   }
 }
 
-window.addEventListener('hashchange', () => {
+window.addEventListener("hashchange", () => {
   updateState()
   updateMap()
 })

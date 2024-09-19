@@ -1,0 +1,11 @@
+{
+  "theme_color": "#3388ff",
+  "background_color": "#000000",
+  "orientation": "any",
+  "display": "standalone",
+  "dir": "auto",
+  "lang": "en-US",
+  "name": "Cycle Map",
+  "short_name": "Cycle Map",
+  "start_url": "/"
+}
