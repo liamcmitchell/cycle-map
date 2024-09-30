@@ -327,7 +327,11 @@ const CycleControl = L.Control.extend({
         title: document.title,
         url: location.href,
       }
-      navigator.share(shareData).catch(() =>
+      if (canShare) {
+        navigator.share(shareData).catch(() => {
+          alert("Failed to share")
+        })
+      } else {
         navigator.clipboard
           .writeText(shareData.url)
           .then(() => {
@@ -338,8 +342,8 @@ const CycleControl = L.Control.extend({
           })
           .catch(() => {
             alert("Failed to copy link")
-          }),
-      )
+          })
+      }
     })
 
     return container
