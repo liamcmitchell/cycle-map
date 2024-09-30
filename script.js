@@ -1,5 +1,3 @@
-const latLngSeparator = "_"
-const markerSeparator = "*"
 const linkSvg =
   '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>'
 const clearSvg =
@@ -8,7 +6,6 @@ const tickSvg =
   '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'
 const shareSvg =
   '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>'
-
 let foundLocation = false
 
 const map = new L.Map("map", { zoom: 12 })
@@ -34,14 +31,93 @@ const locationControl = L.control
   })
   .addTo(map)
 
-/** @param {string} latLng */
+/** @param {String} latLng */
 function parseLatLng(latLng) {
-  return new L.LatLng(...latLng.split(latLngSeparator).map(Number))
+  if (latLng.includes(".")) {
+    return new L.LatLng(...latLng.split("_").map(Number))
+  }
+
+  return new L.LatLng(
+    parseNumber(latLng.slice(0, latLng.length / 2)),
+    parseNumber(latLng.slice(latLng.length / 2)),
+  )
+}
+
+/** @param {String} latLngs */
+function parseLatLngs(latLngs) {
+  const parts = latLngs.split(/[\*~]/).map(parseLatLng)
+
+  if (latLngs.includes(".")) {
+    return parts
+  }
+
+  /** @type {L.LatLng} */
+  let last
+  return parts.map((offset) => {
+    const latLng = !last
+      ? offset
+      : new L.LatLng(last.lat + offset.lat, last.lng + offset.lng)
+    last = latLng
+    return latLng
+  })
 }
 
 /** @param {L.LatLng} latLng */
 function serializeLatLng(latLng) {
-  return [latLng.lat.toFixed(4), latLng.lng.toFixed(4)].join(latLngSeparator)
+  const lat = serializeNumber(latLng.lat)
+  const lng = serializeNumber(latLng.lng)
+  const len = Math.max(lat.length, lng.length)
+  return lat.padStart(len, "0") + lng.padStart(len, "0")
+}
+
+/** @param {L.LatLng[]} latLngs */
+function serializeLatLngs(latLngs) {
+  /** @type {L.LatLng} */
+  let last
+  return latLngs
+    .map((latLng) => {
+      const offset = !last
+        ? latLng
+        : new L.LatLng(latLng.lat - last.lat, latLng.lng - last.lng)
+      last = latLng
+      return serializeLatLng(offset)
+    })
+    .join("*")
+}
+
+const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+/** @param {Number} number */
+function serializeNumber(number) {
+  number = Math.round(number * 10000)
+  if (number >= 0) {
+    number &= ~1
+  } else {
+    number = Math.abs(number) | 1
+  }
+
+  let string = ""
+  while (number > 0) {
+    const remainder = number % chars.length
+    string = chars[remainder] + string
+    number -= remainder
+    number /= chars.length
+  }
+  return string || "0"
+}
+
+/** @param {String} string */
+function parseNumber(string) {
+  let number = 0
+  for (let index = 0; index < string.length; index++) {
+    number +=
+      Math.max(0, chars.indexOf(string[string.length - 1 - index])) *
+      Math.pow(chars.length, index)
+  }
+  if (number & 1) {
+    number = number * -1
+  }
+  return number / 10000
 }
 
 function formatDistance(distance = 0) {
@@ -127,9 +203,7 @@ function createUrl(markers) {
   if (markers?.length) {
     hashParams.set(
       "m",
-      markers
-        .map((marker) => serializeLatLng(marker.getLatLng()))
-        .join(markerSeparator),
+      serializeLatLngs(markers.map((marker) => marker.getLatLng())),
     )
   }
   url.hash = hashParams
@@ -253,18 +327,19 @@ const CycleControl = L.Control.extend({
         title: document.title,
         url: location.href,
       }
-      navigator
-        .share(shareData)
-        .catch(() => navigator.clipboard.writeText(shareData.url).then(() => {
-          shareLink.innerHTML = tickSvg
-          setTimeout(() => {
-            shareLink.innerHTML = shareIcon
-          }, 1000)
-        })
-        .catch(() => {
-          alert("Failed to copy link")
-        }))
-        
+      navigator.share(shareData).catch(() =>
+        navigator.clipboard
+          .writeText(shareData.url)
+          .then(() => {
+            shareLink.innerHTML = tickSvg
+            setTimeout(() => {
+              shareLink.innerHTML = shareIcon
+            }, 1000)
+          })
+          .catch(() => {
+            alert("Failed to copy link")
+          }),
+      )
     })
 
     return container
@@ -311,7 +386,7 @@ function updateState() {
   }
 
   if (params.has("m")) {
-    params.get("m").split(/[\*~]/).map(parseLatLng).map(addMarker)
+    parseLatLngs(params.get("m")).map(addMarker)
   }
 }
 
