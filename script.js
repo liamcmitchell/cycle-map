@@ -15,7 +15,6 @@ const layer = new L.TileLayer(
   {
     maxZoom: 18,
     attribution: [
-      '<a href="https://github.com/liamcmitchell/cycle-map">Source</a>',
       'Maps © <a href="https://www.thunderforest.com">Thunderforest</a>',
       'Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
     ].join(" | "),
