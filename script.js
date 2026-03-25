@@ -17,6 +17,7 @@ const layer = new L.TileLayer(
     attribution: [
       'Maps © <a href="https://www.thunderforest.com">Thunderforest</a>',
       'Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+      '<a href="https://github.com/liamcmitchell/cycle-map">Source</a>'
     ].join(" | "),
   },
 )
@@ -307,7 +308,7 @@ const CycleControl = L.Control.extend({
       location.assign(createUrl())
     })
 
-    const canShare = navigator.canShare({ url: location.href })
+    const canShare = navigator.canShare?.({ url: location.href })
     const shareLink = (this._shareLink = L.DomUtil.create(
       "a",
       "leaflet-bar-part leaflet-bar-part-single share-control",
